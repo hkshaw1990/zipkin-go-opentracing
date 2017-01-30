@@ -3,12 +3,14 @@ package zipkintracer
 import (
 	"sync"
 	"time"
+	"strconv"
 
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/opentracing/opentracing-go/log"
 
 	"github.com/openzipkin/zipkin-go-opentracing/_thrift/gen-go/zipkincore"
+	perfevents "github.com/openzipkin/zipkin-go-opentracing/perfevents"
 )
 
 // Span provides access to the essential details of the span, for use
@@ -34,6 +36,8 @@ type spanImpl struct {
 	// The number of logs dropped because of MaxLogsPerSpan.
 	numDroppedLogs int
 	Endpoint       *zipkincore.Endpoint
+	// perfevent desc
+	EventDesc perfevents.PerfEventInfo
 }
 
 var spanPool = &sync.Pool{New: func() interface{} {
@@ -184,6 +188,15 @@ func rotateLogBuffer(buf []opentracing.LogRecord, pos int) {
 }
 
 func (s *spanImpl) FinishWithOptions(opts opentracing.FinishOptions) {
+	// log and close the perf event first, if any
+	if (s.EventDesc.Fd != -1) {
+		ret := (&s.EventDesc).ReadEvent()
+		if (ret != -1) {
+			(&s.EventDesc).DisableClose()
+		}
+	}
+	s.LogEvent(s.EventDesc.EventName + ": " + strconv.Itoa(int(s.EventDesc.Data)))
+
 	finishTime := opts.FinishTime
 	if finishTime.IsZero() {
 		finishTime = time.Now()

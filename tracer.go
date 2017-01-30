@@ -283,9 +283,15 @@ func (t *tracerImpl) startSpanWithOptions(
 	// Tags.
 	tags := opts.Tags
 
+	perfevent := opts.Perfevent
+
 	// Build the new span. This is the only allocation: We'll return this as
 	// an opentracing.Span.
 	sp := t.getSpan()
+
+	// start monitoring the perf event, if any
+	sp.EventDesc.InitOpenEventEnableSelf(perfevent)
+
 	// Look for a parent in the list of References.
 	//
 	// TODO: would be nice if basictracer did something with all
